@@ -1,0 +1,75 @@
+ftp是基于命令 -> 响应的 协议
+
+1.accept的时候应用select模型进行超时检测
+2.用socketpair实现父子进程双工通信，实现 nobody 进程（父进程） 和 服务进程 （子进程） 
+3.为什么使用多进程模型
+4.common.h 头文件
+  main.c 启动的文件
+  miniftpd.conf ftp 服务器的配置文件
+  parseconf.h .c  配置文件项 和 配置变量 的关系表 和 打开配置文件的函数 parseconf_load_file
+                  parseconf_load_setting 根据配置文件  读取得到 配置文件中的 设置
+  tunable.h .c 配置文件 中默认的变量
+
+
+  privateparent.h .c 父进程 nobody进程 （协助服务进程 工作，比如服务进程PORT模式
+                                        没有权限 bind 20 的端口号 和 客户端 正确的 建立 数据连接通道）
+  ftpproto.h .c 会话  中的 子进程 服务进程  （与客户端 进行 控制连接 和 数据连接）
+  
+  session.h .c 新的会话 （nobody进程  ， 服务进程）
+  str.h .c 字符串处理的文件
+  sysutil.h .c   系统工具模块， tcp_server,writen等网络处理的基本函数
+
+
+开一个会话->子进程是服务进程，直接与客户端交互，发过来的请求，ftp协议，处理控制命令连接和数据连接
+            ，父进程是nobody进程，辅助服务进程与客户端建立数据连接
+   
+
+ struct passwd {
+                    char   *pw_name;       /* username */
+                    char   *pw_passwd;     /* user password */
+                    uid_t   pw_uid;        /* user ID */        
+                    gid_t   pw_gid;        /* group ID */
+                    char   *pw_gecos;      /* user information */
+                    char   *pw_dir;        /* home directory */                                                                     
+                    char   *pw_shell;      /* shell program */
+                };
+   struct passwd *pw = getpwnam(sess->arg);    sess->uid = pw->pw_uid;   
+   struct passwd *pw = getpwuid(sess->uid);    
+   struct spwd   *sp = getspnam(pw->pw_name);
+   char *entrypted_pass = crypt(sess->arg, sp->sp_pwdp);
+
+5.命令映射：解决if else的编写
+6.SYST  当前的系统类型
+  FEAT  请求服务器的特征
+  CLNT
+  PWD   列出当前工作目录
+  TYPE  传输模式 （A 表示 ASCII  ，I 表示 非 ASCII）
+  PASV  创建数据连接 ，被动模式 数据连接
+  PORT  客户端IP和端口，主动模式 
+  LIST  列目录， 创建数据连接通道，传输列表，关闭数据套接字，
+7.获取本地地址信息 ，getsockname（已连接套接字，
+  获取对端          int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+  网络字节序 ->   主机字节序    ntohs 
+8.ftp服务进程  与 客户端 通信 是 基于 ftp协议
+   nobody 进程 完成  数据连接 通道的 创建，内部自定义协议
+   FTP服务进程接收到PORT h1,h2,h3,h4,p1,p2
+   解析ipport
+   向nobody进程  PRIV_SOCK_GET_DATA_SOCK命令   1个字节
+   向nobody进程  一个整数   port                            4个字节
+   向nobody进程 一个字符串  ip                              不定长
+   nobody 进程接收 PRIV_SOCK_GET_DATA_SOCK命令
+   进一步 接收 一个整数 ，也就是 port
+   接收一个 字符串， 也就是 ip
+   socket
+   bind(20)
+   connect(ip,port);
+9.如何保证服务进程退出的时候，nobody进程也退出
+  客户端断开连接 ，服务进程 readline返回为 0，服务进程结束了，
+              会自动将 socketpair所对应的套接字 自动关闭了，
+             nobody进程处于 priv_sock_get_cmd 状态，返回为0， res != sizeof(res) -> exit(EXIT_FAILURE);
+
+10,nobody进程其实也没有权限bind （20）， 采用capabilities机制提升nobody进程特权，capset
+
+
+
+

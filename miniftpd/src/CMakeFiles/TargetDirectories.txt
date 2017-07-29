@@ -1,0 +1,1 @@
+/home/liuqi/miniftpd/src/CMakeFiles/miniftpd.dir
